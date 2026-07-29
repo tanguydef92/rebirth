@@ -117,6 +117,7 @@ class Simulation(Forest.FireModel, Forest.AgentModel):
         super().__init__(fire_source)
 
     def simulate(self):
+        global step
         time.sleep(self.delta_time)
         self.transition()
         if self.number_agents:
@@ -126,6 +127,14 @@ class Simulation(Forest.FireModel, Forest.AgentModel):
                     self.plot(self.grid)
         else:
             self.plot(self.grid)
+        # Save a frame for non-GUI runs so we can assemble a visualization later
+        if not USE_GUI:
+            try:
+                os.makedirs('results/first_simulation/frames', exist_ok=True)
+                # step is defined in run_sim and incremented there
+                self.fig.savefig(f'results/first_simulation/frames/frame_{step:04d}.png')
+            except Exception as e:
+                print("Warning: failed to save frame:", e)
         healthy, onfire, burnt, extinguished = self.calc_stats()
         print("trees healthy:", healthy, "on fire:", onfire, "burnt:", burnt, "extinguished:", extinguished)
         return onfire == 0
