@@ -1,0 +1,6 @@
+#!/Users/tanguydefenoyl/copilot-worktrees/rebirth/tanguydef92-probable-barnacle/forfis-prototype/.venv/bin/python3
+import sys
+from fontTools.ttx import main
+if __name__ == '__main__':
+    sys.argv[0] = sys.argv[0].removesuffix('.exe')
+    sys.exit(main())
