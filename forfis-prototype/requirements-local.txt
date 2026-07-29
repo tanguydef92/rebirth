@@ -1,0 +1,4 @@
+hexalattice==1.1.0
+numpy>=1.24.0
+matplotlib>=3.6
+PyYAML
