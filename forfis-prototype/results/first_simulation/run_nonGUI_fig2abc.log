@@ -1,0 +1,41 @@
+Loaded config file
+step: 1
+trees healthy: 0.9965986394557823 on fire: 0.002834467120181406 burnt: 0.0005668934240362812 extinguished: 0.0
+step: 2
+trees healthy: 0.9920634920634921 on fire: 0.006235827664399093 burnt: 0.0017006802721088435 extinguished: 0.0
+step: 3
+trees healthy: 0.9829931972789115 on fire: 0.01020408163265306 burnt: 0.006802721088435374 extinguished: 0.0
+step: 4
+trees healthy: 0.9727891156462585 on fire: 0.013038548752834467 burnt: 0.01417233560090703 extinguished: 0.0
+step: 5
+trees healthy: 0.9586167800453514 on fire: 0.01927437641723356 burnt: 0.022108843537414966 extinguished: 0.0
+step: 6
+trees healthy: 0.941609977324263 on fire: 0.023809523809523808 burnt: 0.03458049886621315 extinguished: 0.0
+step: 7
+trees healthy: 0.9217687074829932 on fire: 0.024943310657596373 burnt: 0.05328798185941043 extinguished: 0.0
+step: 8
+trees healthy: 0.8990929705215419 on fire: 0.02947845804988662 burnt: 0.07142857142857142 extinguished: 0.0
+step: 9
+trees healthy: 0.8735827664399093 on fire: 0.035147392290249435 burnt: 0.09126984126984126 extinguished: 0.0
+step: 10
+trees healthy: 0.8441043083900227 on fire: 0.03968253968253968 burnt: 0.11621315192743764 extinguished: 0.0
+step: 11
+trees healthy: 0.8117913832199547 on fire: 0.03854875283446712 burnt: 0.14965986394557823 extinguished: 0.0
+step: 12
+trees healthy: 0.7760770975056689 on fire: 0.04931972789115646 burnt: 0.1746031746031746 extinguished: 0.0
+step: 13
+trees healthy: 0.7363945578231292 on fire: 0.05328798185941043 burnt: 0.21031746031746032 extinguished: 0.0
+step: 14
+trees healthy: 0.6921768707482994 on fire: 0.05952380952380952 burnt: 0.24829931972789115 extinguished: 0.0
+step: 15
+trees healthy: 0.6473922902494331 on fire: 0.06179138321995465 burnt: 0.29081632653061223 extinguished: 0.0
+step: 16
+trees healthy: 0.5986394557823129 on fire: 0.0663265306122449 burnt: 0.33503401360544216 extinguished: 0.0
+Simulation finished!
+Overall statistics:
+Chosen strategie finding algorithm: user
+Time steps needed: 17
+Trees remained healthy(%): 59.863945578231295
+Extinguished Trees(%): 0.0
+Burnt Trees(%): 33.50340136054422
+success metric value: 32.518367346938774
