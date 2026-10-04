@@ -33,9 +33,16 @@ class Forest:
         if self.number_agents:
             self.agents = []
             self.actions = np.zeros((self.rows, self.columns))
-            for i in range(self.number_agents):
-                self.agents.append((1 + i, 1))
-                # adapt start positions of agents here
+            # Place the first wave of agents evenly across the top row (row 0).
+            # If number_agents > columns, wrap across subsequent columns.
+            try:
+                cols = np.linspace(0, self.columns - 1, self.number_agents, dtype=int) if self.number_agents <= self.columns else [i % self.columns for i in range(self.number_agents)]
+            except Exception:
+                # Fallback placement in case of unexpected values
+                cols = [min(i, self.columns - 1) for i in range(self.number_agents)]
+            for c in cols:
+                self.agents.append((0, int(c)))
+            # adapt start positions of agents here
         else:
             self.agents = []
             self.actions = np.zeros((self.rows, self.columns))
@@ -150,12 +157,29 @@ class FireModel(Forest):
                         if np.linalg.norm(self.wind) == 0:
                             self.prob_transit[row, column] += 1 - self.alpha_0 ** fire_neighbors
                         else:
-                            neighbor_vector = np.array([1, 1])
-                            product_alpha = 1
+                            # Compute per-neighbor ignition probabilities influenced by wind direction and strength.
+                            wind_norm = np.linalg.norm(self.wind)
+                            # avoid division by zero (already guarded) but keep safe
+                            wind_dir = self.wind / (wind_norm + 1e-12)
+                            prod_no_ignite = 1.0
                             for (neighbor_x, neighbor_y) in positions:
                                 neighbor_vector = static.vector(neighbor=np.array([neighbor_x, neighbor_y]), current_position=np.array([row, column]), grid=self.grid)
-                                product_alpha *= self.alpha_0 * np.linalg.norm(self.wind)/(1-(1-self.alpha_0/self.alpha_wind)*np.dot(self.wind, neighbor_vector))
-                            self.prob_transit[row, column] += 1 - product_alpha
+                                neighbor_vector = np.array(neighbor_vector, dtype=float)
+                                # directional alignment in [-1, 1]
+                                cos_theta = np.dot(wind_dir, neighbor_vector)
+                                # base per-neighbor ignition probability modified by wind alignment
+                                # self.alpha_wind scales how strongly wind biases ignition; clamp result to [0,1]
+                                p_i = self.alpha_0 * (1.0 + (self.alpha_wind * cos_theta))
+                                # temper by wind magnitude so extremely large winds don't produce huge probabilities
+                                wind_scale = wind_norm / (1.0 + wind_norm)
+                                p_i = p_i * wind_scale
+                                # clamp
+                                if p_i < 0.0:
+                                    p_i = 0.0
+                                if p_i > 1.0:
+                                    p_i = 1.0
+                                prod_no_ignite *= (1.0 - p_i)
+                            self.prob_transit[row, column] += 1.0 - prod_no_ignite
                     else:
                         self.prob_transit[row, column] = 0
                 if self.forest[row, column] == 2:  # on fire

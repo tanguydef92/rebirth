@@ -1,14 +1,14 @@
 # First demo config for a small, fast non-GUI run
-size: 41
-alpha: 7
-beta: 4
+size: 101
+alpha: 9
+beta: 1
 delta_beta: 10
-alpha_wind: 10
-wind_x: 1.0
-wind_y: 0.5
-memoryless: true
+alpha_wind: 100
+wind_x: 20.0
+wind_y: 20.0
+memoryless: false
 # simulation parameters
-timesteps: 10
+timesteps: 50
 agents: 0
 # general setup
 gui: false

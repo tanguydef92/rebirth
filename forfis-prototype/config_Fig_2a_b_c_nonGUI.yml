@@ -1,0 +1,17 @@
+agents: 0
+alpha: 7
+alpha_wind: 10
+beta: 6
+delta_beta: 10
+extinguished: 0.2
+grid: hexagonal
+gui: false
+healthy: 0.6
+logfile: false
+memoryless: false
+mode: user
+size: 42
+time: 0.2
+timesteps: 16
+wind_x: 0
+wind_y: 0

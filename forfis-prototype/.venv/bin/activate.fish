@@ -29,7 +29,7 @@ end
 # Unset irrelevant variables.
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV "/Users/tanguydefenoyl/copilot-worktrees/rebirth/tanguydef92-probable-barnacle/forfis-prototype/.venv"
+set -gx VIRTUAL_ENV "/Users/tanguydefenoyl/Desktop/rebirth/rebirth/forfis-prototype/.venv"
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/bin" $PATH

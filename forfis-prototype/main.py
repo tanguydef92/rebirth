@@ -45,7 +45,7 @@ try:
     USE_LOGFILE = config["logfile"]
     print("Loaded config file")
 except:
-    size = 22
+    size = 41
     alpha = 7
     beta = 4
     delta_beta = 10
