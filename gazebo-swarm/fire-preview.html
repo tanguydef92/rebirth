@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fire propagation · No swarm</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0b1118;color:#e3edf3;font:15px system-ui,sans-serif}main{max-width:1100px;margin:auto;padding:24px}h1{font-size:25px;margin:0 0 8px}p{color:#9eb1c0;line-height:1.5;margin:0 0 14px}.stats,.controls,.legend{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin:16px 0}.stats span{color:#abc0d0}.stats strong{color:#ffbd73}canvas{display:block;width:100%;height:min(66vh,750px);background:#131e28;border:1px solid #2c4051;border-radius:12px}button,select{background:#23384a;border:1px solid #4a6377;border-radius:7px;padding:8px 12px;color:#e3edf3;font:inherit}input[type=range]{flex:1;min-width:160px;accent-color:#ffac5b}.legend{font-size:13px;color:#abc0d0}.key{display:inline-block;width:12px;height:12px;margin-right:6px;border-radius:2px}.note{font-size:12px;margin-top:18px}#clock{font-variant-numeric:tabular-nums}label{font-size:13px}@media(max-width:600px){main{padding:14px}.controls{gap:10px}canvas{height:55vh}}
+</style>
+<main><h1>Fire propagation</h1><p id="subtitle"></p>
+<div class="stats"><span>Burning <strong id="active"></strong></span><span>Previously ignited <strong id="burned"></strong></span><span>Fuel consumed <strong id="fuel"></strong></span><span>Peak temperature <strong id="temperature"></strong></span></div>
+<canvas id="view" aria-label="Animated top-down view of fire, terrain temperature and fuel"></canvas>
+<div class="controls"><button id="play">Pause</button><button id="restart">Restart</button><input id="time" type="range" min="0" value="0" step="0.1" aria-label="Simulation time"><span id="clock"></span><select id="speed" aria-label="Playback speed"><option value="1">×1</option><option value="10" selected>×10</option><option value="30">×30</option><option value="60">×60</option></select><select id="layer" aria-label="Displayed field"><option value="fire">Fire</option><option value="temperature">Temperature</option><option value="fuel">Remaining fuel</option></select><label><input id="particles" type="checkbox" checked> Hot gas parcels</label></div>
+<div class="legend" id="legend"></div><p class="note">Wind transports hot gas. Cells heat up, consume fuel and burn out. No drones, water or suppression actions are present. This is an uncalibrated reduced model inspired by the paper; the preview replays a simulation calculated in Python.</p></main>
+<script>
+const data=__FIRE_DATA__;
+const canvas=document.querySelector('#view'),ctx=canvas.getContext('2d'),slider=document.querySelector('#time');
+const frames=data.frames,config=data.config,grid=data.grid,physics=config.fire.physics;
+const ambient=physics.ambient_temperature_k||293.15,ignition=physics.ignition_temperature_k||600;
+const wind=physics.wind_m_s||[2,0];
+document.querySelector('#subtitle').textContent=`${2*config.world_bound} m × ${2*config.world_bound} m world · ${config.fire.cell_size} m cells · wind ${Math.hypot(...wind).toFixed(1)} m/s · no swarm`;
+slider.max=config.duration;
+let time=0,playing=true,last=performance.now(),shown=-1,shownLayer='',lastReady=0;
+const cache=new Map(),pending=new Set(),surface=document.createElement('canvas');surface.width=grid.nx;surface.height=grid.ny;
+const surfaceContext=surface.getContext('2d');
+function frameIndex(t){let lo=0,hi=frames.length;while(lo<hi){const mid=(lo+hi)>>1;if(frames[mid].time<=t)lo=mid+1;else hi=mid;}return Math.max(0,lo-1);}
+function decode(index){
+  if(cache.has(index)||pending.has(index)||index>=frames.length)return;
+  pending.add(index);const image=new Image();
+  image.onload=()=>{const scratch=document.createElement('canvas');scratch.width=grid.nx;scratch.height=grid.ny;const context=scratch.getContext('2d');context.drawImage(image,0,0);cache.set(index,context.getImageData(0,0,grid.nx,grid.ny).data);pending.delete(index);if(cache.size>6){for(const key of cache.keys()){if(key!==index&&Math.abs(key-frameIndex(time))>2){cache.delete(key);if(cache.size<=6)break;}}}render();};
+  image.onerror=()=>{pending.delete(index);document.querySelector('#clock').textContent='Could not decode this frame';};
+  image.src='data:image/png;base64,'+frames[index].grid;
+}
+function heatColor(q){const stops=[[13,38,72],[25,114,155],[244,173,61],[238,73,26],[255,234,205]],s=q/255*4,i=Math.min(3,Math.floor(s)),a=s-i;return stops[i].map((v,k)=>Math.round(v*(1-a)+stops[i+1][k]*a));}
+function paint(index,layer){
+  if(shown===index&&shownLayer===layer)return;
+  const raw=cache.get(index),pixels=surfaceContext.createImageData(grid.nx,grid.ny);
+  for(let i=0;i<raw.length;i+=4){const temperature=raw[i],fuel=raw[i+1],state=raw[i+2];let color;
+    if(layer==='temperature')color=heatColor(temperature);
+    else if(layer==='fuel')color=state===3?[80,94,107]:[18+fuel*.13,27+fuel*.52,24+fuel*.23];
+    else color=state===1?[255,90+Math.min(100,temperature*.5),28]:state===2?[55,49,47]:state===3?[80,94,107]:[29+fuel*.12,56+fuel*.28,37+fuel*.12];
+    pixels.data[i]=color[0];pixels.data[i+1]=color[1];pixels.data[i+2]=color[2];pixels.data[i+3]=255;
+  }
+  surfaceContext.putImageData(pixels,0,0);shown=index;shownLayer=layer;
+}
+function render(){
+  const requested=frameIndex(time);decode(requested);decode(Math.min(frames.length-1,requested+1));
+  if(!cache.has(requested)){if(!cache.has(lastReady))return;}else lastReady=requested;
+  const index=lastReady,frame=frames[index],layer=document.querySelector('#layer').value;
+  paint(index,layer);
+  const w=canvas.clientWidth,h=canvas.clientHeight,dpr=window.devicePixelRatio||1;
+  if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);}
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
+  const extent=2*config.world_bound,size=Math.min(w,h)*.92,left=(w-size)/2,top=(h-size)/2;
+  const project=(x,y)=>[left+(x+config.world_bound)/extent*size,top+(config.world_bound-y)/extent*size];
+  ctx.fillStyle='#182832';ctx.fillRect(left,top,size,size);ctx.strokeStyle='#29404f';ctx.lineWidth=1;
+  for(let v=-config.world_bound;v<=config.world_bound;v+=100){ctx.beginPath();let a=project(v,-config.world_bound),b=project(v,config.world_bound);ctx.moveTo(...a);ctx.lineTo(...b);a=project(-config.world_bound,v);b=project(config.world_bound,v);ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke();}
+  const domain=config.fire.domain,cell=config.fire.cell_size,origin=project((domain[0]-.5)*cell,(domain[3]+.5)*cell);
+  ctx.imageSmoothingEnabled=false;ctx.drawImage(surface,origin[0],origin[1],grid.nx*cell/extent*size,grid.ny*cell/extent*size);
+  if(document.querySelector('#particles').checked){ctx.fillStyle='#ffda8aaa';for(const [x,y] of frame.particles){const q=project(x,y);ctx.beginPath();ctx.arc(q[0],q[1],1.8,0,2*Math.PI);ctx.fill();}}
+  const speed=Math.hypot(...wind);if(speed){const ax=left+size-85,ay=top+35,bx=ax+wind[0]/speed*42,by=ay-wind[1]/speed*42;ctx.strokeStyle='#d6ecf5';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.stroke();const angle=Math.atan2(by-ay,bx-ax);for(const side of [-1,1]){ctx.beginPath();ctx.moveTo(bx,by);ctx.lineTo(bx-9*Math.cos(angle+side*.5),by-9*Math.sin(angle+side*.5));ctx.stroke();}ctx.fillStyle='#d6ecf5';ctx.font='12px system-ui';ctx.fillText('Wind',ax-5,ay+25);}
+  ctx.fillStyle='#b1c5d0';ctx.font='12px system-ui';ctx.fillText('N ↑',left+8,top+17);
+  document.querySelector('#active').textContent=`${frame.active_cells.toLocaleString()} cells`;
+  document.querySelector('#burned').textContent=`${(frame.burned_cells*cell*cell).toLocaleString()} m²`;
+  document.querySelector('#fuel').textContent=`${(frame.metrics.fuel_consumed_kg/1000).toFixed(1)} t`;
+  document.querySelector('#temperature').textContent=`${(frame.metrics.maximum_temperature_k-273.15).toFixed(0)} °C`;
+  document.querySelector('#clock').textContent=`${frame.time.toFixed(0)} / ${config.duration} s · ${frame.active_cells?'Burning':frame.fire_potential?'Residual heat':'Extinguished'}`;
+  slider.value=time;
+  document.querySelector('#legend').innerHTML=layer==='temperature'?`Temperature: ${(ambient-273.15).toFixed(0)} → ${(grid.maximum_temperature_k-273.15).toFixed(0)} °C · ignition ${(ignition-273.15).toFixed(0)} °C`:layer==='fuel'?`Remaining fuel: 0 → ${grid.maximum_fuel_load_kg_m2.toFixed(1)} kg/m²`:'<span><i class="key" style="background:#427347"></i>Unburned fuel</span><span><i class="key" style="background:#ff8b1c"></i>Burning</span><span><i class="key" style="background:#37312f"></i>Previously burned</span><span><i class="key" style="background:#505e6b"></i>No fuel</span>';
+}
+function tick(now){if(playing){time=Math.min(config.duration,time+Math.min(.2,(now-last)/1000)*Number(document.querySelector('#speed').value));if(time>=config.duration){playing=false;document.querySelector('#play').textContent='Replay';}}last=now;render();requestAnimationFrame(tick);}
+document.querySelector('#play').onclick=()=>{if(time>=config.duration)time=0;playing=!playing;document.querySelector('#play').textContent=playing?'Pause':'Play';};
+document.querySelector('#restart').onclick=()=>{time=0;playing=true;document.querySelector('#play').textContent='Pause';};
+slider.oninput=()=>{time=Number(slider.value);render();};
+document.querySelector('#layer').onchange=render;document.querySelector('#particles').onchange=render;
+decode(0);requestAnimationFrame(tick);
+</script></html>

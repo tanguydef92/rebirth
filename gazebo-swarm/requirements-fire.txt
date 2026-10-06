@@ -1,0 +1,2 @@
+# Thermal fire simulation dependencies.
+numpy>=1.24,<3

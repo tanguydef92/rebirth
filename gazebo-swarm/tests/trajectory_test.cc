@@ -18,6 +18,10 @@ int main()
   assert(trajectory.At(-1)[0] == 0);
   assert(trajectory.At(0.5)[2] == 3);
   assert(trajectory.At(0.5)[3] == 3.5);  // Unwrapped yaw, no 2pi jump.
+  assert(trajectory.At(0.999, false)[2] == 0);
+  assert(trajectory.At(1.0, false)[2] == 6);
+  assert(trajectory.At(1.5, false)[2] == 6);
+  assert(trajectory.At(2.0, false)[2] == 0);
   assert(trajectory.At(10)[0] == 4);
   assert(trajectory.At(1.5)[2] == 3);
   assert(trajectory.At(0.5)[2] == 3);  // Gazebo reset/rewind.

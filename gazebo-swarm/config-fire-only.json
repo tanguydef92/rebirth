@@ -1,0 +1,93 @@
+{
+  "duration": 600.0,
+  "world_bound": 500.0,
+  "snapshot_interval": 2.0,
+  "fire": {
+    "seed": 42,
+    "cell_size": 2.0,
+    "domain": [
+      -180,
+      180,
+      -180,
+      180
+    ],
+    "initial_cells": [
+      [
+        0,
+        0
+      ]
+    ],
+    "ignition_time": 0.0,
+    "update_interval": 1.0,
+    "height": 8.0,
+    "initial_rectangle": [
+      -70,
+      70,
+      -70,
+      70
+    ],
+    "model": "lagrangian",
+    "physics": {
+      "ambient_temperature_k": 293.15,
+      "ignition_temperature_k": 600.0,
+      "initial_temperature_k": 900.0,
+      "fuel_load_kg_m2": 1.5,
+      "inert_load_kg_m2": 1.0,
+      "solid_specific_heat_j_kg_k": 1500.0,
+      "gas_specific_heat_j_kg_k": 1000.0,
+      "heat_of_combustion_j_kg": 16000000.0,
+      "pyrolysis_rate_at_ignition_s": 0.005,
+      "activation_energy_j_mol": 35000.0,
+      "maximum_pyrolysis_rate_s": 0.02,
+      "burnout_fraction": 0.05,
+      "initial_reaction_fraction": 0.3,
+      "gas_reaction_rate_s": 0.8,
+      "initial_air_fuel_ratio": 8.0,
+      "entrainment_rate_s": 0.08,
+      "heat_exchange_rate_s": 2.0,
+      "terrain_cooling_time_s": 180.0,
+      "gas_cooling_time_s": 20.0,
+      "parcel_lifetime_s": 60.0,
+      "wind_m_s": [
+        2.0,
+        0.0
+      ],
+      "transport_factor": 0.5,
+      "turbulence_rms_m_s": 0.7,
+      "turbulence_time_s": 3.0,
+      "maximum_substep_s": 0.25,
+      "water_latent_heat_j_kg": 2260000.0,
+      "water_density_kg_l": 1.0,
+      "water_cooling_efficiency": 0.35
+    },
+    "terrain_regions": [
+      {
+        "bounds": [
+          -180,
+          -1,
+          -180,
+          180
+        ],
+        "fuel_load_kg_m2": 0.8
+      },
+      {
+        "bounds": [
+          0,
+          180,
+          -180,
+          180
+        ],
+        "fuel_load_kg_m2": 2.0
+      },
+      {
+        "bounds": [
+          30,
+          32,
+          -180,
+          180
+        ],
+        "fuel_load_kg_m2": 0.0
+      }
+    ]
+  }
+}

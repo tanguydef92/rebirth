@@ -1,0 +1,196 @@
+{
+  "drone_count": 1000,
+  "pattern": "suppress",
+  "duration": 690.0,
+  "takeoff_duration": 90.0,
+  "landing_duration": 90.0,
+  "sample_hz": 2,
+  "spacing": 6.0,
+  "minimum_separation": 5.0,
+  "maximum_speed": 15.0,
+  "show_paths": false,
+  "navigation": {
+    "start": [
+      -480,
+      -480
+    ],
+    "cruise_speed": 10.0,
+    "vertical_speed": 3.0,
+    "world_bound": 500.0,
+    "clearance": 3.0,
+    "start_layout": "corners",
+    "corner_offset": 480.0,
+    "descent_speed": 2.0
+  },
+  "fire": {
+    "seed": 42,
+    "cell_size": 2.0,
+    "domain": [
+      -180,
+      180,
+      -180,
+      180
+    ],
+    "initial_cells": [
+      [
+        0,
+        0
+      ]
+    ],
+    "ignition_time": 0.0,
+    "update_interval": 1.0,
+    "height": 8.0,
+    "initial_rectangle": [
+      -70,
+      70,
+      -70,
+      70
+    ],
+    "model": "lagrangian",
+    "physics": {
+      "ambient_temperature_k": 293.15,
+      "ignition_temperature_k": 600.0,
+      "initial_temperature_k": 900.0,
+      "fuel_load_kg_m2": 1.5,
+      "inert_load_kg_m2": 1.0,
+      "solid_specific_heat_j_kg_k": 1500.0,
+      "gas_specific_heat_j_kg_k": 1000.0,
+      "heat_of_combustion_j_kg": 16000000.0,
+      "pyrolysis_rate_at_ignition_s": 0.005,
+      "activation_energy_j_mol": 35000.0,
+      "maximum_pyrolysis_rate_s": 0.02,
+      "burnout_fraction": 0.05,
+      "initial_reaction_fraction": 0.3,
+      "gas_reaction_rate_s": 0.8,
+      "initial_air_fuel_ratio": 8.0,
+      "entrainment_rate_s": 0.08,
+      "heat_exchange_rate_s": 2.0,
+      "terrain_cooling_time_s": 180.0,
+      "gas_cooling_time_s": 20.0,
+      "parcel_lifetime_s": 60.0,
+      "wind_m_s": [
+        2.0,
+        0.0
+      ],
+      "transport_factor": 0.5,
+      "turbulence_rms_m_s": 0.7,
+      "turbulence_time_s": 3.0,
+      "maximum_substep_s": 0.25,
+      "water_latent_heat_j_kg": 2260000.0,
+      "water_density_kg_l": 1.0,
+      "water_cooling_efficiency": 0.35
+    },
+    "terrain_regions": [
+      {
+        "bounds": [
+          -180,
+          -1,
+          -180,
+          180
+        ],
+        "fuel_load_kg_m2": 0.8
+      },
+      {
+        "bounds": [
+          0,
+          180,
+          -180,
+          180
+        ],
+        "fuel_load_kg_m2": 2.0
+      },
+      {
+        "bounds": [
+          30,
+          32,
+          -180,
+          180
+        ],
+        "fuel_load_kg_m2": 0.0
+      }
+    ]
+  },
+  "suppression": {
+    "tank_capacity_l": 20.0,
+    "water_to_extinguish_l": 4.0,
+    "drop_radius": 0.9,
+    "refill_point": [
+      -480,
+      -480,
+      1
+    ],
+    "holding_radius": 8.0,
+    "altitude_lanes": [
+      20,
+      26,
+      32,
+      38,
+      44,
+      50,
+      56,
+      62,
+      68,
+      74,
+      80,
+      86
+    ],
+    "decision_interval": 1.0,
+    "return_duration": 240.0,
+    "water_application_l_m2": 1.0,
+    "water_payload_kg": 20.0,
+    "water_density_kg_l": 1.0,
+    "refill_duration": 10.0,
+    "perimeter_only": true,
+    "drone_radius": 1.6,
+    "refill_layout": "homes",
+    "allocation_model": "ppo",
+    "ppo_checkpoint": "models/ppo-100-fast.json",
+    "state_interval": 0.5,
+    "compact_log": true,
+    "drop_duration": 1.0,
+    "cache_policy_actions": true,
+    "record_decisions": false
+  },
+  "visualization": {
+    "fire_tile_size": 20.0
+  },
+  "learning": {
+    "observation_time_scale_s": 600.0,
+    "sectors": 16,
+    "seed": 7,
+    "training_seeds": [
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108
+    ],
+    "validation_seeds": [
+      301,
+      302
+    ],
+    "test_seeds": [
+      9001,
+      9002,
+      9003
+    ],
+    "episode_duration": 240.0,
+    "steps": 8192,
+    "n_steps": 128,
+    "batch_size": 128,
+    "n_epochs": 6,
+    "learning_rate": 0.0003,
+    "gamma": 0.99,
+    "gae_lambda": 0.95,
+    "clip_range": 0.2,
+    "ent_coef": 0.01,
+    "fleet_backend": "individual",
+    "decision_step_s": 1.0,
+    "observation_version": 2,
+    "num_envs": 4,
+    "validation_interval": 4096
+  }
+}

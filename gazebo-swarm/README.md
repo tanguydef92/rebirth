@@ -1,136 +1,152 @@
-# Essaim Gazebo — bêta, 10 drones
+# Thermal fire and PPO drone swarm
 
-Module indépendant de `forfis-prototype`. Gazebo **Harmonic / Sim 8**, Python ≥3.9
-et C++17. Aucun paquet pip, ROS, PX4, Docker ou modèle téléchargé à l'exécution.
+Train with **100 individual drones**, then deploy the same central policy with
+**1,000 drones**. Training, live simulation and Gazebo exports use the same
+causal engine, thermal fire, drone motion and water-service logic.
 
-Pour le guide rapide en anglais et les fichiers à modifier pour les trajectoires
-et destinations, voir le [README du dépôt](../README.md#change-trajectories-and-targets).
+## Launch
 
-La bêta modélise les **trajectoires cinématiques** de dix quadricoptères colorés.
-Le plugin prescrit leur pose à chaque pas du temps simulé : il ne calcule pas la
-poussée des moteurs, le vent, la batterie ou un autopilote. Les modèles statiques
-se déplacent sur commande ; les collisions ne modifient pas les trajectoires.
-Les distances minimales sont validées pour les trajets prescrits, et ne sont pas
-un algorithme d'évitement d'obstacles. Aucun drone réel n'est connecté.
-
-## Aperçu immédiat, sans installation
-
-Depuis la racine du dépôt :
+From the repository root:
 
 ```bash
-python3 gazebo-swarm/swarm.py generate
-open gazebo-swarm/output/preview.html
+bash gazebo-swarm/install-learning.sh
+bash gazebo-swarm/run-live.sh --config gazebo-swarm/configs/ppo-1000-fast.json --speed 8 --open
 ```
 
-L'aperçu 3D autonome fonctionne sans réseau, avec lecture/pause, curseur de temps,
-vitesse ×1/×2/×4, rotation et zoom. Il utilise les mêmes échantillons CSV que le
-plugin Gazebo ; ce n'est pas une capture de Gazebo.
+The server prints a local URL. The browser plots executed direction arrows and
+the selected drone's target, altitude, velocity, tank and station. Controls:
+pause, restart, speed, and fire/temperature/remaining-fuel layers. The view is in
+plan; vertical motion appears in the inspector. States are computed online,
+with 0.5-second navigation steps, one-second policy decisions and up to 10 Hz
+of browser updates. `--daemon` keeps the server in the background; `endpoint.json`
+records its URL and PID.
 
-## Installer et lancer sur macOS Apple Silicon
+A full tank is **20 L / 20 kg**. Refilling takes **10 seconds after arrival**
+at an exclusively reserved station. A drop releases the tank immediately and
+holds position for **one second**. Water applies only to the current perimeter,
+rechecked after each earlier drone's dose. Stations are shared and placed at the
+1,000 home positions. Starts are balanced across the four corners of the 1 km
+world. Speed: 10 m/s horizontal, 3 m/s climbing, 2 m/s descending; lanes: 20–86 m;
+minimum separation: 5 m. These rapid service times are experiment parameters.
 
-Les outils de compilation Apple doivent être disponibles. L'installation locale
-télécharge Pixi et les paquets précompilés conda-forge dans `.tools/`, `.pixi/`
-et `.cache/`, sans modifier les paquets Python de ForFiS. Le fichier `pixi.lock`
-fixe les versions résolues. Les scripts de lancement activent cet environnement
-automatiquement. Le script s'arrête en cas d'erreur ; aucun sudo automatique.
+Completed runs write `report.json`, `trajectories.npz`, `refill-events.json` and
+`water-drops.json` under `output/live-1000-fast/`.
+
+## Train and evaluate
+
+```bash
+gazebo-swarm/.learning-venv/bin/python gazebo-swarm/train_ppo.py --config gazebo-swarm/configs/ppo-100-fast.json --steps 8192 --output gazebo-swarm/output/ppo-100-fast-training
+gazebo-swarm/.learning-venv/bin/python gazebo-swarm/train_ppo.py --resume gazebo-swarm/output/ppo-100-fast-training/last_model.zip --steps 100000
+gazebo-swarm/.learning-venv/bin/python gazebo-swarm/train_ppo.py --evaluate-only gazebo-swarm/output/ppo-100-fast-training/ppo_model.zip --output gazebo-swarm/output/evaluation
+```
+
+Stable-Baselines3 PPO uses four parallel environments of 100 drones, including
+real travel, altitude, collision reservations, refills and drops. It observes
+87 current-state features and produces 16 sector logits, converted into water
+fractions over observed frontier sectors. One feature measures available
+operational water relative to frontier cooling demand. The controller turns
+fractions into individual targets. Reward penalizes newly burned area, fire
+persistence and water consumption; it imposes no uniformity bonus.
+
+The included actor completed **8,192 PPO steps**. Training seeds: 101–108;
+validation selection: 301–302; held-out tests: 9001–9003. Each test episode lasts
+240 seconds after takeoff. Higher return is better:
+
+| Policy | Mean return | Mean newly burned area |
+| --- | ---: | ---: |
+| PPO | −257.769 | 21,463 m² |
+| Uniform per exposed edge | −257.936 | 21,551 m² |
+| Random concentrated allocation | −255.508 | 21,199 m² |
+| No water | −257.763 | 21,561 m² |
+
+This short run does **not** establish superior PPO performance. Random allocation
+performed better; the PPO/uniform difference is small relative to variation
+between seeds. The 1,000-drone run verifies deployment, rather than policy
+superiority at that scale. See [actor provenance](models/README.md) and
+[complete evaluation](models/ppo-100-fast-evaluation.json).
+
+The JSON actor is inference-only. `last_model.zip` includes optimizer/critic
+state for resuming; `ppo_model.zip` is the selected checkpoint. Outputs and
+Python environments are ignored by Git. The installed versions are recorded
+in the requirements files; the learning environment isolates PyTorch from
+Gazebo's conda/OpenMP runtime.
+
+## Gazebo
 
 ```bash
 bash gazebo-swarm/install-local.sh
 bash gazebo-swarm/run.sh
 ```
 
-Autre option : `bash gazebo-swarm/install-macos.sh` installe Harmonic via Homebrew
-et déclare son dépôt officiel OSRF fiable. Sur certains macOS, cette option exige
-beaucoup de compilations et met à jour les dépendances Homebrew existantes.
-
-Le lanceur démarre séparément le serveur et l'interface, conformément aux
-[instructions macOS de Gazebo](https://gazebosim.org/docs/harmonic/getstarted/#macos).
-Il attend le service du monde avant d'ouvrir la vue et arrête son propre serveur
-quand l'interface se ferme. L'interface macOS peut être instable selon le moteur
-graphique ; le lanceur utilise Ogre 2 avec Metal sur macOS. Le mode sans interface
-reste disponible.
-La mission commence immédiatement avec `-r` ; après 100 s les drones restent posés.
-Utiliser les commandes de pause/réinitialisation de Gazebo ou relancer le script.
+Gazebo Harmonic / Sim 8 uses the generated SDF and CSV poses. The launcher uses
+the current 1,000-drone configuration by default. Generation needs NumPy; the
+launcher uses `.learning-venv` when available. For a prepared mission:
 
 ```bash
-bash gazebo-swarm/run.sh --pattern helix
-bash gazebo-swarm/run.sh --pattern sweep
-bash gazebo-swarm/run.sh --headless --iterations 1500
-python3 gazebo-swarm/verify_telemetry.py
+bash gazebo-swarm/run.sh --replay --output gazebo-swarm/output
 ```
 
-À 0,01 s par pas, 1500 itérations couvrent environ 15 s simulées. Pour toute la
-mission : `--iterations 10100`. Sans limite, interrompre avec Ctrl+C.
-Ne pas lancer deux missions en même temps dans le même dossier `output`.
+`--headless --iterations 1500` runs 15 seconds without the GUI. Verify recorded
+poses with `python3 gazebo-swarm/verify_telemetry.py --output gazebo-swarm/output`.
+For more than 200 drones, the plugin applies poses directly without a Gazebo
+physics solver. Fire visualization uses 20 m tiles while propagation remains
+on 2 m cells. Poses are prescribed; motors, aerodynamics, batteries and PX4/ROS 2
+are not simulated. The standalone `output/preview.html` replays the same export
+with rotation, zoom and time controls.
 
-## Ubuntu 22.04 / 24.04
-
-Installer Harmonic suivant la
-[documentation officielle](https://gazebosim.org/docs/harmonic/install_ubuntu/),
-puis `cmake`, un compilateur C++ et les bibliothèques de développement :
+## Fire alone
 
 ```bash
-sudo apt install cmake g++ libgz-sim8-dev libgz-plugin2-dev
+gazebo-swarm/.learning-venv/bin/python gazebo-swarm/fire_only.py
+open gazebo-swarm/output/fire-only/preview.html
+```
+
+[config-fire-only.json](config-fire-only.json) simulates 600 seconds without
+water or drones. The thermal domain has 361 × 361 cells of 2 m inside the 1 km
+world, wind at 2 m/s eastward, different fuel loads and a fuel-free strip.
+The preview offers fire, temperature, remaining fuel and hot-gas particles.
+
+[ParticleFire](fire/particles.py) adapts ideas from
+[Petersen et al. (2023)](https://www.repository.cam.ac.uk/handle/1810/350891):
+finite fuel, Arrhenius pyrolysis, transported hot gas, reaction/entrainment,
+conservative heat exchange and latent-heat water cooling. Particles in one cell
+are merged conservatively. A dose removes `efficiency × water mass × latent heat`
+from the terrain; remaining hot gases can reignite a cooled cell.
+
+Coefficients and terrain are uncalibrated demonstration assumptions. This is
+a reduced model, not an exact reproduction of the paper. Radiation, embers,
+relief, detailed chemistry and three-dimensional gas flow are omitted.
+
+## Code and parameters
+
+| Component | Main files |
+| --- | --- |
+| Configuration and safety bounds | [configuration.py](configuration.py), [simulation/settings.py](simulation/settings.py) |
+| Training, reward and evaluation | [training/ppo.py](training/ppo.py), [individual_env.py](training/individual_env.py), [evaluation.py](training/evaluation.py) |
+| Shared simulation and exports | [simulation/engine.py](simulation/engine.py), [mission.py](simulation/mission.py), [validation.py](simulation/validation.py) |
+| Live viewer | [simulation/live.py](simulation/live.py), [live.html](simulation/live.html) |
+| Targets, water and navigation | [drones/controller.py](drones/controller.py), [navigation.py](drones/navigation.py), [geometry.py](drones/geometry.py), [spatial.py](drones/spatial.py) |
+| Drone state and PPO contract | [drones/state.py](drones/state.py), [policy.py](drones/policy.py) |
+| Fire physics and grid geometry | [fire/particles.py](fire/particles.py), [grid.py](fire/grid.py) |
+| Training/deployment settings | [configs/ppo-100-fast.json](configs/ppo-100-fast.json), [ppo-1000-fast.json](configs/ppo-1000-fast.json) |
+| Gazebo models and playback | [swarm.py](swarm.py), [src/SwarmPlayback.cc](src/SwarmPlayback.cc), [Trajectory.hh](src/Trajectory.hh) |
+
+Root scripts `train_ppo.py`, `live_sim.py` and `fire_only.py` are executable
+entry points. Implementation changes belong in the packages above. Only thermal
+fire, individual-drone training and the current 87-feature actor are supported.
+
+Performance improvements include batched NumPy observations, cached preflight
+states, spatial collision indexes, vectorized distances, NumPy actor inference
+and parallel environments. The thermal substep remains 0.25 seconds. A 30-step
+benchmark fell from 2.75 to 1.57 seconds; the first complete live 1,000-drone run
+simulated 690 seconds in about 115 seconds, including validation.
+
+## Checks
+
+```bash
+python3 -m unittest discover -s gazebo-swarm/tests
+gazebo-swarm/.learning-venv/bin/python -m unittest discover -s gazebo-swarm/tests -p 'test_ppo_training.py'
 bash gazebo-swarm/build.sh
-bash gazebo-swarm/run.sh
 ```
 
-## Configuration et résultats
-
-Modifier `config.json` : nombre de drones (2–50), parcours, durée, altitude,
-rayon, espacement de la grille, hauteur de l'hélice, seuil de séparation,
-limite de vitesse et affichage des chemins. La configuration par défaut est :
-
-- 10 drones ; cercle de rayon 10 m ; altitude 6 m.
-- Décollage 10 s, mission 80 s, atterrissage 10 s.
-- 20 échantillons/s, interpolation linéaire à chaque pas Gazebo (100 Hz).
-- Écart minimal requis 2 m ; vitesse maximale autorisée 5 m/s.
-
-Les parcours utilisent une progression quintique pour des départs et arrêts doux.
-`circle` fait un tour ; `helix` ajoute une montée/descente collective ; `sweep`
-déplace une grille sur un parcours sinusoïdal. Tous reviennent au point de départ.
-Les positions sont exprimées en mètres, le temps en secondes, le lacet en radians.
-
-```bash
-python3 gazebo-swarm/swarm.py generate --pattern sweep
-python3 gazebo-swarm/swarm.py generate --config gazebo-swarm/config.json --output /tmp/ma-mission
-python3 gazebo-swarm/swarm.py doctor
-```
-
-Le générateur refuse les configurations qui dépassent la vitesse ou la distance
-de sécurité. La séparation est calculée analytiquement sur **chaque segment
-interpolé**, pas seulement aux points échantillonnés.
-
-`output/` contient :
-
-- `swarm.sdf` : monde, dix modèles locaux et chemins visibles.
-- `trajectories/drone_01.csv` … `drone_10.csv` : temps, x, y, z, yaw.
-- `mission.json`, `report.json` : mission complète et métriques validées.
-- `preview.html` : visualisation autonome.
-- `telemetry.csv` : positions réellement lues dans Gazebo à 10 Hz, après lancement.
-- `server.log` : journal du serveur en mode graphique.
-
-Le SDF contient des chemins absolus vers les CSV. Régénérer après déplacement du
-projet. Le lanceur le fait automatiquement. La télémétrie est réécrite à chaque
-lancement ; copier les résultats pour conserver une expérience. `output/` et
-`build/` sont exclus de Git. ForFiS reste indépendant ; la connexion aux zones
-d'incendie et un contrôle physique des rotors sont des extensions futures.
-
-## Vérification
-
-```bash
-python3 -m unittest discover -s gazebo-swarm/tests -v
-bash gazebo-swarm/build.sh
-bash gazebo-swarm/run.sh --headless --iterations 1500
-```
-
-Les tests Python couvrent les trois parcours, décollage/atterrissage, vitesse,
-séparation entre échantillons, configuration et concordance SDF/CSV/aperçu.
-Le test C++ couvre le lecteur CSV, l'interpolation et le retour dans le temps.
-Le lancement Gazebo vérifie séparément l'intégration du plugin et la télémétrie.
-`verify_telemetry.py` compare les positions enregistrées aux trajectoires et
-refuse les drones absents, les données incomplètes ou les écarts supérieurs à 5 cm.
-Un aperçu navigateur réussi ne valide pas à lui seul l'exécution Gazebo.
-
-Résultats de l'exécution locale et limites graphiques observées :
-[VALIDATION.md](VALIDATION.md).
+[VALIDATION.md](VALIDATION.md) records measured simulation, learning and playback checks.

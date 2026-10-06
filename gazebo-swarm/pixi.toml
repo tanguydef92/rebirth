@@ -1,7 +1,7 @@
 [workspace]
 name = "gazebo-swarm-beta"
 version = "0.1.0"
-description = "Ten-drone kinematic swarm using Gazebo Harmonic"
+description = "Thermal fire and PPO drone-swarm playback using Gazebo Harmonic"
 channels = ["conda-forge"]
 platforms = ["osx-arm64"]
 

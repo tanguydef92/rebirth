@@ -1,58 +1,49 @@
 # Rebirth simulation prototypes
 
-This repository contains two independent experiments:
-
-- [Gazebo swarm beta](gazebo-swarm/README.md): ten drones following automatically
-  generated trajectories, with a standalone 3D preview and CSV telemetry.
+- [Gazebo swarm](gazebo-swarm/README.md): thermal wildfire simulation, PPO training with 100 individual drones, and deployment with 1,000 drones.
 - [ForFiS prototype](forfis-prototype/README.md): forest-fire simulation.
 
-## Run the drone universe
+From the repository root, launch the current live simulation:
 
-On macOS Apple Silicon, from this repository's root:
+```bash
+bash gazebo-swarm/install-learning.sh
+bash gazebo-swarm/run-live.sh --config gazebo-swarm/configs/ppo-1000-fast.json --speed 8 --open
+```
+
+The browser shows current drone directions, selected targets, altitude, tank water
+and PPO sector allocations. Each drone carries 20 L, refills in 10 seconds after
+arrival, and releases its tank immediately with a one-second drop interval.
+
+Train or resume the policy:
+
+```bash
+gazebo-swarm/.learning-venv/bin/python gazebo-swarm/train_ppo.py --steps 8192
+gazebo-swarm/.learning-venv/bin/python gazebo-swarm/train_ppo.py --resume gazebo-swarm/output/ppo-100-fast-training/last_model.zip --steps 100000
+```
+
+For native Gazebo playback on macOS Apple Silicon:
 
 ```bash
 bash gazebo-swarm/install-local.sh
 bash gazebo-swarm/run.sh
 ```
 
-The local Pixi environment installs Gazebo Harmonic and builds the C++ playback
-plugin. After installation, only the second command is needed. For an immediate
-preview without Gazebo:
+Gazebo exports and replays the same simulation engine used by PPO and the live
+viewer. Its poses are prescribed kinematically; this is not an autopilot or motor
+simulation. The included PPO actor is a short beta run and did not outperform
+the random allocation baseline.
 
-```bash
-python3 gazebo-swarm/swarm.py generate
-open gazebo-swarm/output/preview.html
-```
-
-## Change trajectories and targets
-
-| File | What to change |
+| Change | File |
 | --- | --- |
-| [`gazebo-swarm/config.json`](gazebo-swarm/config.json) | Drone count, `pattern` (`circle`, `helix`, `sweep`), altitude, radius, grid spacing, mission timing, speed and separation limits. |
-| [`gazebo-swarm/swarm.py`](gazebo-swarm/swarm.py) | `position(config, index, time)` defines each drone's `(x, y, z, yaw)` over time. Edit it for custom destinations or waypoints. `world_document()` defines the environment and drone geometry. |
-| [`gazebo-swarm/src/Trajectory.hh`](gazebo-swarm/src/Trajectory.hh) | Reads CSV trajectories and interpolates poses between samples. Change only to alter playback/interpolation. |
-| [`gazebo-swarm/src/SwarmPlayback.cc`](gazebo-swarm/src/SwarmPlayback.cc) | Applies poses using Gazebo's simulation clock and records actual positions. Change to alter the runtime controller. |
+| Training fleet, services and hyperparameters | [configs/ppo-100-fast.json](gazebo-swarm/configs/ppo-100-fast.json) |
+| Deployment fleet, speeds, altitudes and fire parameters | [configs/ppo-1000-fast.json](gazebo-swarm/configs/ppo-1000-fast.json) |
+| PPO training and validation selection | [training/ppo.py](gazebo-swarm/training/ppo.py) |
+| Reward and individual-drone training environment | [training/individual_env.py](gazebo-swarm/training/individual_env.py) |
+| Observations and sector allocations | [drones/policy.py](gazebo-swarm/drones/policy.py) |
+| Assign targets and reserve refill stations | [drones/controller.py](gazebo-swarm/drones/controller.py) |
+| Updated directions and collision avoidance | [drones/navigation.py](gazebo-swarm/drones/navigation.py) |
+| Fire propagation and water cooling | [fire/particles.py](gazebo-swarm/fire/particles.py) |
+| Online simulation and plotting | [simulation/engine.py](gazebo-swarm/simulation/engine.py), [live.html](gazebo-swarm/simulation/live.html) |
+| Gazebo playback | [swarm.py](gazebo-swarm/swarm.py), [SwarmPlayback.cc](gazebo-swarm/src/SwarmPlayback.cc) |
 
-The default missions take off, follow a path, return to their starting positions,
-and land. **There is currently no configurable target or waypoint list.** Define
-destination coordinates and approach/landing behavior in `position()` to change
-the target. For a simple translation of the entire mission, add the same x/y
-offsets to the coordinates returned by that function. For a new end destination,
-vary the offset smoothly during the mission and hold the final offset during
-landing. Keep the drones separated throughout the trip.
-
-After changing configuration or `swarm.py`, run `bash gazebo-swarm/run.sh` again:
-it regenerates the world and CSV files automatically. To preview the new mission,
-rerun `python3 gazebo-swarm/swarm.py generate`. After editing C++ code, first run
-`bash gazebo-swarm/build.sh` to rebuild the plugin.
-
-The flow is: **configuration → Python trajectory generator → CSV + SDF world →
-C++ playback in Gazebo**. The HTML preview uses the same generated samples.
-Generated results, installed packages, and build artifacts stay outside Git.
-Do not edit `output/trajectories/*.csv` as the primary configuration: generation
-overwrites them.
-
-This beta is kinematic: poses are prescribed, with no motor or autopilot dynamics.
-The ten-drone circle mission was validated for 100.91 simulated seconds. The
-native macOS view still emits rendering errors; the standalone HTML preview is
-available as a fallback. See [validation details](gazebo-swarm/VALIDATION.md).
+See the [swarm guide](gazebo-swarm/README.md) and [validation results](gazebo-swarm/VALIDATION.md).

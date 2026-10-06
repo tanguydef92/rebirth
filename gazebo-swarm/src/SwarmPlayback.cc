@@ -13,6 +13,7 @@
 #include <gz/sim/components/Model.hh>
 #include <gz/sim/components/Name.hh>
 #include <gz/sim/components/ParentEntity.hh>
+#include <gz/sim/components/Pose.hh>
 #include <sdf/Element.hh>
 
 namespace swarm
@@ -27,6 +28,8 @@ class SwarmPlayback final : public gz::sim::System,
     std::string name;
     Trajectory trajectory;
     gz::sim::Entity entity{gz::sim::kNullEntity};
+    std::array<double, 4> lastPose{};
+    bool hasPose{false};
   };
 
  public:
@@ -35,11 +38,12 @@ class SwarmPlayback final : public gz::sim::System,
                  gz::sim::EntityComponentManager &,
                  gz::sim::EventManager &) override
   {
-    world = entity;
+      world = entity;
     try
     {
       if (!sdf->HasElement("drone"))
         throw std::runtime_error("No drone trajectories configured");
+      directPose = sdf->Get<bool>("direct_pose", false).first;
       auto config = sdf->Clone();
       auto entry = config->GetElement("drone");
       while (entry)
@@ -48,15 +52,49 @@ class SwarmPlayback final : public gz::sim::System,
             Trajectory(entry->Get<std::string>("trajectory"))});
         entry = entry->GetNextElement("drone");
       }
+      if (config->HasElement("obstacle"))
+      {
+        entry = config->GetElement("obstacle");
+        while (entry)
+        {
+          obstacles.push_back({entry->Get<std::string>("name"),
+              Trajectory(entry->Get<std::string>("trajectory"))});
+          entry = entry->GetNextElement("obstacle");
+        }
+      }
+      if (config->HasElement("water"))
+      {
+        entry = config->GetElement("water");
+        while (entry)
+        {
+          waterStreams.push_back({entry->Get<std::string>("name"),
+              Trajectory(entry->Get<std::string>("trajectory"))});
+          entry = entry->GetNextElement("water");
+        }
+      }
       if (sdf->HasElement("telemetry"))
       {
         telemetry.open(sdf->Get<std::string>("telemetry"));
         if (!telemetry) throw std::runtime_error("Cannot open telemetry file");
         telemetry << "time,drone,x,y,z,yaw\n" << std::setprecision(10);
       }
+      if (sdf->HasElement("fire_telemetry"))
+      {
+        fireTelemetry.open(sdf->Get<std::string>("fire_telemetry"));
+        if (!fireTelemetry) throw std::runtime_error("Cannot open fire telemetry file");
+        fireTelemetry << "time,model,x,y,z,yaw\n" << std::setprecision(10);
+      }
+      if (sdf->HasElement("water_telemetry"))
+      {
+        waterTelemetry.open(sdf->Get<std::string>("water_telemetry"));
+        if (!waterTelemetry) throw std::runtime_error("Cannot open water telemetry file");
+        waterTelemetry << "time,model,x,y,z,yaw\n" << std::setprecision(10);
+      }
       ready = true;
       gzmsg << "SwarmPlayback: " << drones.size()
-            << " trajectories loaded (kinematic beta).\n";
+            << " trajectories, " << obstacles.size()
+            << " fire cells, " << waterStreams.size()
+            << " water streams loaded (kinematic beta).\n";
     }
     catch (const std::exception &error)
     {
@@ -69,19 +107,44 @@ class SwarmPlayback final : public gz::sim::System,
   {
     if (!ready || info.paused) return;
     const double time = std::chrono::duration<double>(info.simTime).count();
-    for (auto &drone : drones)
+    if (time < lastUpdate)
     {
-      if (drone.entity == gz::sim::kNullEntity)
-      {
-        drone.entity = ecm.EntityByComponents(gz::sim::components::Model(),
-            gz::sim::components::Name(drone.name),
-            gz::sim::components::ParentEntity(world));
-        if (drone.entity == gz::sim::kNullEntity) continue;
-      }
-      const auto pose = drone.trajectory.At(time);
-      gz::sim::Model(drone.entity).SetWorldPoseCmd(ecm,
-          gz::math::Pose3d(pose[0], pose[1], pose[2], 0, 0, pose[3]));
+      for (auto &actor : obstacles) actor.hasPose = false;
+      for (auto &actor : waterStreams) actor.hasPose = false;
     }
+    lastUpdate = time;
+    const auto update = [&](std::vector<Drone> &models, bool interpolate)
+    {
+      for (auto &drone : models)
+      {
+        if (drone.entity == gz::sim::kNullEntity)
+        {
+          drone.entity = ecm.EntityByComponents(gz::sim::components::Model(),
+              gz::sim::components::Name(drone.name),
+              gz::sim::components::ParentEntity(world));
+          if (drone.entity == gz::sim::kNullEntity) continue;
+        }
+        const auto pose = drone.trajectory.At(time, interpolate);
+        if (!interpolate && drone.hasPose && pose == drone.lastPose) continue;
+        drone.lastPose = pose;
+        drone.hasPose = true;
+        const gz::math::Pose3d target(pose[0], pose[1], pose[2], 0, 0, pose[3]);
+        if (directPose)
+        {
+          // Models are direct children of the world. Kinematic playback needs
+          // no physics engine; relative link/visual poses stay fixed.
+          if (ecm.SetComponentData<gz::sim::components::Pose>(drone.entity, target))
+            ecm.SetChanged(drone.entity, gz::sim::components::Pose::typeId,
+                gz::sim::ComponentState::PeriodicChange);
+        }
+        else
+          gz::sim::Model(drone.entity).SetWorldPoseCmd(ecm, target);
+      }
+    };
+    update(drones, true);
+    // Fire appears/disappears instantaneously; never tween through the floor.
+    update(obstacles, false);
+    update(waterStreams, false);
   }
 
   void PostUpdate(const gz::sim::UpdateInfo &info,
@@ -102,14 +165,35 @@ class SwarmPlayback final : public gz::sim::System,
                 << pose.Rot().Yaw() << '\n';
     }
     telemetry.flush();
+    const auto logActors = [&](const std::vector<Drone> &actors, std::ofstream &output)
+    {
+      if (!output) return;
+      for (const auto &obstacle : actors)
+      {
+        if (obstacle.entity == gz::sim::kNullEntity) continue;
+        const auto pose = gz::sim::worldPose(obstacle.entity, ecm);
+        output << time << ',' << obstacle.name << ',' << pose.Pos().X()
+                      << ',' << pose.Pos().Y() << ',' << pose.Pos().Z()
+                      << ',' << pose.Rot().Yaw() << '\n';
+      }
+      output.flush();
+    };
+    logActors(obstacles, fireTelemetry);
+    logActors(waterStreams, waterTelemetry);
   }
 
  private:
   gz::sim::Entity world{gz::sim::kNullEntity};
   bool ready{false};
+  bool directPose{false};
   double lastLog{-1.0};
+  double lastUpdate{-1.0};
   std::vector<Drone> drones;
+  std::vector<Drone> obstacles;
+  std::vector<Drone> waterStreams;
   std::ofstream telemetry;
+  std::ofstream fireTelemetry;
+  std::ofstream waterTelemetry;
 };
 }  // namespace swarm
 

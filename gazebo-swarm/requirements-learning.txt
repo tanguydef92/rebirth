@@ -1,0 +1,4 @@
+# Training only; Gazebo playback and exported PPO inference stay stdlib-only.
+stable-baselines3==2.9.0
+torch==2.14.1
+gymnasium==1.4.0

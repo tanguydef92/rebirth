@@ -50,13 +50,14 @@ class Trajectory
       throw std::runtime_error("Trajectory must start at zero and have >=2 rows");
   }
 
-  std::array<double, 4> At(double time) const
+  std::array<double, 4> At(double time, bool interpolate = true) const
   {
     if (time <= samples.front().time) return samples.front().pose;
     if (time >= samples.back().time) return samples.back().pose;
     auto next = std::upper_bound(samples.begin(), samples.end(), time,
         [](double t, const Sample &sample) { return t < sample.time; });
     const auto &previous = *(next - 1);
+    if (!interpolate) return previous.pose;
     double alpha = (time - previous.time) / (next->time - previous.time);
     std::array<double, 4> result{};
     for (std::size_t i = 0; i < result.size(); ++i)

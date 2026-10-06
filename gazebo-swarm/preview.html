@@ -8,20 +8,151 @@
 </style>
 <header><div><h1>Essaim de drones</h1><p>Trajectoires automatiques · Aperçu de la mission Gazebo</p></div><span class="badge">BÊTA CINÉMATIQUE</span></header>
 <main><div class="metrics" id="metrics"></div><canvas id="view" aria-label="Visualisation 3D des trajectoires des drones"></canvas>
-<div class="controls"><button id="play">Pause</button><button id="restart">Recommencer</button><input id="time" aria-label="Temps de mission" type="range" min="0" step="0.05" value="0"><span id="clock"></span><select id="speed" aria-label="Vitesse de lecture"><option value="1">×1</option><option value="2">×2</option><option value="4">×4</option></select><label><input id="paths" type="checkbox" checked> Trajectoires</label></div>
-<p class="note">Glisse la vue pour tourner, utilise la molette pour zoomer. Cet aperçu autonome lit les mêmes coordonnées que Gazebo. Les trajectoires prescrites incluent décollage et atterrissage ; la bêta ne simule pas les moteurs, le vent ou l'évitement d'obstacles.</p></main>
+<div class="controls"><button id="play">Pause</button><button id="restart">Recommencer</button><input id="time" aria-label="Temps de mission" type="range" min="0" step="0.05" value="0"><span id="clock"></span><select id="speed" aria-label="Vitesse de lecture"><option value="1">×1</option><option value="2">×2</option><option value="4">×4</option></select><label><input id="paths" type="checkbox" checked> Trajectoires</label><label id="fireToggle"><input id="fire" type="checkbox" checked> Feu</label></div>
+<p class="note" id="note">Glisse la vue pour tourner, utilise la molette pour zoomer. Cet aperçu autonome lit les mêmes coordonnées que Gazebo. La bêta ne simule pas les moteurs ou le vent.</p></main>
+<style>.tanks{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:16px 32px}.tank{padding:10px;border:1px solid #263b4b;border-radius:8px;font-size:12px}.tank progress{display:block;width:100%;height:8px;margin-top:8px;accent-color:#55baff}.water-stats{margin:0 32px;color:#a3d6ff;font-size:13px}</style>
+<div class="water-stats" id="waterStats" hidden></div><div class="tanks" id="tanks" hidden></div>
+<div class="water-stats" id="fleetInspector" hidden><label>Drone suivi <input id="selectedDrone" type="number" min="1" value="1" style="width:80px"></label><p id="allocation"></p></div>
 <script>
 const mission=__MISSION_DATA__;
-const config=mission.config, tracks=mission.trajectories, canvas=document.querySelector('#view'),ctx=canvas.getContext('2d'), slider=document.querySelector('#time');
-slider.max=config.duration;
-document.querySelector('#metrics').innerHTML=`<span><strong>${config.drone_count}</strong> drones</span><span>Parcours <strong>${({circle:'circulaire',helix:'hélicoïdal',sweep:'balayage'})[config.pattern]}</strong></span><span>Séparation ≥ <strong>${mission.metrics.minimum_separation_m.toFixed(2)} m</strong></span><span>Vitesse ≤ <strong>${mission.metrics.maximum_speed_m_s.toFixed(2)} m/s</strong></span>`;
-let time=0,playing=true,last=performance.now(),azimuth=-.7,elevation=.8,zoom=1,drag=null;
-const colors=tracks.map((_,i)=>`hsl(${i/tracks.length*360} 75% 65%)`);
-function project(p){const x=p[0]*Math.cos(azimuth)-p[1]*Math.sin(azimuth),y=p[0]*Math.sin(azimuth)+p[1]*Math.cos(azimuth),z=p[2];const scale=Math.min(canvas.clientWidth,canvas.clientHeight)/(config.radius*3.6+10)*zoom;return[canvas.clientWidth/2+x*scale,canvas.clientHeight*.65+(y*Math.cos(elevation)-z*Math.sin(elevation))*scale,y*Math.sin(elevation)+z*Math.cos(elevation)];}
-function stroke(points,color,width=1){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();points.forEach((p,i)=>{const q=project(p);i?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1]);});ctx.stroke();}
-function pose(track){const n=track.length-1,s=time/config.duration*n,i=Math.min(Math.floor(s),n-1),a=s-i;return track[i].slice(1).map((v,k)=>v+a*(track[i+1][k+1]-v));}
-function render(){const w=canvas.clientWidth,h=canvas.clientHeight,dpr=window.devicePixelRatio||1;if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);}ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);for(let i=-30;i<=30;i+=5){stroke([[i,-30,0],[i,30,0]],'#243746');stroke([[-30,i,0],[30,i,0]],'#243746');}if(document.querySelector('#paths').checked)tracks.forEach((track,i)=>{ctx.globalAlpha=.3;const stride=Math.max(1,Math.floor(track.length/180));stroke(track.filter((_,j)=>j%stride===0).map(p=>p.slice(1)),colors[i],1.5);});ctx.globalAlpha=1;
-const drones=tracks.map((track,i)=>({i,p:pose(track)})).sort((a,b)=>project(a.p)[2]-project(b.p)[2]);drones.forEach(({i,p})=>{const ground=project([p[0],p[1],0]),q=project(p);ctx.fillStyle='#0005';ctx.beginPath();ctx.ellipse(ground[0],ground[1],7,3,0,0,Math.PI*2);ctx.fill();const arm=.42;for(const sign of [-1,1]){const rot=(dx,dy)=>[p[0]+dx*Math.cos(p[3])-dy*Math.sin(p[3]),p[1]+dx*Math.sin(p[3])+dy*Math.cos(p[3]),p[2]];stroke([rot(-arm,sign*arm),rot(arm,-sign*arm)],colors[i],2);for(const dx of [-arm,arm]){const rotor=project(rot(dx,sign*dx));ctx.strokeStyle=colors[i];ctx.beginPath();ctx.ellipse(rotor[0],rotor[1],4,2,0,0,Math.PI*2);ctx.stroke();}}ctx.fillStyle=colors[i];ctx.beginPath();ctx.arc(q[0],q[1],4,0,Math.PI*2);ctx.fill();ctx.font='11px system-ui';ctx.fillText(String(i+1).padStart(2,'0'),q[0]+9,q[1]-6);});slider.value=time;const phase=time<config.takeoff_duration?'Décollage':time>config.duration-config.landing_duration?'Atterrissage':'Mission';document.querySelector('#clock').textContent=`${time.toFixed(1)} / ${config.duration} s · ${phase}`;}
-function frame(now){if(playing){time=Math.min(config.duration,time+Math.min((now-last)/1000,.2)*Number(document.querySelector('#speed').value));if(time===config.duration){playing=false;document.querySelector('#play').textContent='Rejouer';}}last=now;render();requestAnimationFrame(frame);}requestAnimationFrame(frame);
-document.querySelector('#play').onclick=()=>{if(time===config.duration)time=0;playing=!playing;document.querySelector('#play').textContent=playing?'Pause':'Lecture';};document.querySelector('#restart').onclick=()=>{time=0;playing=true;document.querySelector('#play').textContent='Pause';};slider.oninput=()=>{time=Number(slider.value);};canvas.onpointerdown=e=>{drag=[e.clientX,e.clientY];canvas.setPointerCapture(e.pointerId);};canvas.onpointermove=e=>{if(!drag)return;azimuth+=(e.clientX-drag[0])*.008;elevation=Math.max(.15,Math.min(1.5,elevation+(e.clientY-drag[1])*.006));drag=[e.clientX,e.clientY];};canvas.onpointerup=()=>drag=null;canvas.onpointercancel=()=>drag=null;canvas.onwheel=e=>{e.preventDefault();zoom=Math.max(.35,Math.min(3,zoom*Math.exp(-e.deltaY*.001)));};
+const config = mission.config, tracks = mission.trajectories;
+const canvas = document.querySelector('#view'), ctx = canvas.getContext('2d');
+const slider = document.querySelector('#time'), hasFire = Boolean(mission.fire);
+const fighting = Boolean(mission.suppression);
+const largeFleet = tracks.length > 200;
+const selector = document.querySelector('#selectedDrone');
+selector.max = tracks.length;
+document.querySelector('#fleetInspector').hidden = !largeFleet || !fighting;
+let selectedDrone = 1, shownState = null, shownDrone = null;
+selector.oninput = () => {selectedDrone = Math.max(1, Math.min(tracks.length, Number(selector.value)||1)); shownState = null;};
+slider.max = config.duration;
+document.querySelector('#paths').checked=config.show_paths;
+document.querySelector('#fireToggle').hidden = !hasFire;
+document.querySelector('#metrics').innerHTML = `<span><strong>${config.drone_count}</strong> drones</span>
+  <span>Parcours <strong>Lutte contre le feu</strong></span>
+  <span>Séparation ≥ <strong>${mission.metrics.minimum_separation_m.toFixed(2)} m</strong></span>
+  <span>Vitesse ≤ <strong>${mission.metrics.maximum_speed_m_s.toFixed(2)} m/s</strong></span>`
+  + (hasFire ? `<span>Seed <strong>${config.fire.seed}</strong> · <strong>${mission.navigation.replans}</strong> recalculs</span>` : '');
+if (hasFire) document.querySelector('#note').textContent = 'Glisse pour tourner, molette pour zoomer. Orange : feu actif et volumes à éviter. Vert : cible et emplacements d’arrivée. Blanc pointillé : dernier plan calculé avec l’état courant du feu. Le feu et les décisions ont été simulés pas à pas en Python ; Gazebo et cet aperçu les rejouent ensemble. Modèle de propagation stylisé, sans dynamique moteur.';
+if (fighting) {
+  document.querySelector('#note').textContent = `Orange : feu actif. Bleu : eau et stations. Les drones arrosent les fronts observés et réservent une station libre pour recharger. Les stations sont bleues si libres, orange si réservées ; un remplissage dure ${config.suppression.refill_duration} s. Les altitudes différentes et les détours maintiennent la séparation. Glisse pour tourner, molette pour zoomer. Simulation causale en Python puis lecture synchronisée ; modèle simplifié du feu et de l’eau.`;
+  document.querySelector('#tanks').hidden=false;document.querySelector('#waterStats').hidden=false;
+  if(largeFleet)document.querySelector('#note').textContent+=` Monde de ${2*config.navigation.world_bound} m × ${2*config.navigation.world_bound} m. Calcul du feu à ${config.fire.cell_size} m ; affichage regroupé à ${config.visualization?.fire_tile_size||config.fire.cell_size} m. Choisis un drone pour inspecter son réservoir et sa trajectoire.`;
+}
+let time = 0, playing = true, last = performance.now(), azimuth = -.7, elevation = .8, zoom = 1, drag = null;
+const colors = tracks.map((_, i) => `hsl(${i / tracks.length * 360} 75% 65%)`);
+const extent = config.navigation.world_bound;
+function project(p) {
+  const x = p[0]*Math.cos(azimuth)-p[1]*Math.sin(azimuth);
+  const y = p[0]*Math.sin(azimuth)+p[1]*Math.cos(azimuth), z = p[2];
+  const scale = Math.min(canvas.clientWidth,canvas.clientHeight)/(extent*2.4+10)*zoom;
+  return [canvas.clientWidth/2+x*scale,canvas.clientHeight*.65+(y*Math.cos(elevation)-z*Math.sin(elevation))*scale,y*Math.sin(elevation)+z*Math.cos(elevation)];
+}
+function stroke(points, color, width=1) {
+  ctx.strokeStyle=color; ctx.lineWidth=width; ctx.beginPath();
+  points.forEach((p,i)=>{const q=project(p);i?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1]);}); ctx.stroke();
+}
+function polygon(points, color) {
+  ctx.fillStyle=color; ctx.beginPath();
+  points.forEach((p,i)=>{const q=project(p);i?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1]);});ctx.closePath();ctx.fill();
+}
+function latest(entries) {
+  if (!entries.length || time < entries[0].time) return null;
+  let low=0,high=entries.length;
+  while(low<high){const mid=(low+high)>>1;if(entries[mid].time<=time)low=mid+1;else high=mid;}
+  return entries[low-1];
+}
+function pose(track) {
+  const n=track.length-1,s=time/config.duration*n,i=Math.min(Math.floor(s),n-1),a=s-i;
+  return track[i].slice(1).map((v,k)=>v+a*(track[i+1][k+1]-v));
+}
+function marker(point, label, color) {
+  const q=project([...point,0]);ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(q[0],q[1],9,5,0,0,Math.PI*2);ctx.stroke();
+  ctx.fillStyle=color;ctx.font='13px system-ui';ctx.fillText(label,q[0]+12,q[1]+5);
+}
+function drawFire(snapshot) {
+  const size=snapshot.render_cell_size||config.fire.cell_size,h=config.fire.height;
+  const offset=snapshot.render_active ? .5 : 0;
+  (snapshot.render_active||snapshot.active).forEach(([cx,cy])=>{
+    const x=(cx+offset)*size,y=(cy+offset)*size,r=size/2;
+    polygon([[x-r,y-r,0],[x+r,y-r,0],[x+r,y+r,0],[x-r,y+r,0]],'#ff6b20aa');
+    polygon([[x-r,y-r,0],[x+r,y-r,0],[x+r,y-r,h],[x-r,y-r,h]],'#ff8a2424');
+    polygon([[x+r,y-r,0],[x+r,y+r,0],[x+r,y+r,h],[x+r,y-r,h]],'#ff8a2424');
+    stroke([[x-r,y-r,h],[x+r,y-r,h],[x+r,y+r,h],[x-r,y+r,h],[x-r,y-r,h]],'#ff9c4850');
+    const q=project([x,y,.5]);ctx.fillStyle='#ffbe52';ctx.beginPath();ctx.arc(q[0],q[1],2+Math.sin(time*5+cx+cy)*.5,0,Math.PI*2);ctx.fill();
+  });
+}
+function drawDrone(i,p) {
+  const ground=project([p[0],p[1],0]),q=project(p);
+  if(largeFleet) {
+    ctx.fillStyle=colors[i];ctx.beginPath();ctx.arc(q[0],q[1],i+1===selectedDrone?5:2,0,Math.PI*2);ctx.fill();
+    if(i+1===selectedDrone){ctx.fillStyle='#fff';ctx.font='13px system-ui';ctx.fillText('D'+selectedDrone,q[0]+8,q[1]-6);}
+    return;
+  }
+  ctx.fillStyle='#0005';ctx.beginPath();ctx.ellipse(ground[0],ground[1],7,3,0,0,Math.PI*2);ctx.fill();
+  const arm=.42,rot=(dx,dy)=>[p[0]+dx*Math.cos(p[3])-dy*Math.sin(p[3]),p[1]+dx*Math.sin(p[3])+dy*Math.cos(p[3]),p[2]];
+  for(const sign of [-1,1]) {
+    stroke([rot(-arm,sign*arm),rot(arm,-sign*arm)],colors[i],2);
+    for(const dx of [-arm,arm]){const rotor=project(rot(dx,sign*dx));ctx.strokeStyle=colors[i];ctx.beginPath();ctx.ellipse(rotor[0],rotor[1],4,2,0,0,Math.PI*2);ctx.stroke();}
+  }
+  ctx.fillStyle=colors[i];ctx.beginPath();ctx.arc(q[0],q[1],4,0,Math.PI*2);ctx.fill();ctx.font='11px system-ui';ctx.fillText(String(i+1).padStart(2,'0'),q[0]+9,q[1]-6);
+}
+function drawWater(snapshot,state) {
+  const stations=mission.suppression.refill_points||[config.suppression.refill_point];
+  stations.forEach((point,i)=>{
+    const owner=state?.station_owners?.[i] ?? (stations.length===1?state?.station_owner:null);
+    if(largeFleet){const q=project(point);ctx.fillStyle=owner?'#ffba55':'#55baff';ctx.fillRect(q[0]-1,q[1]-1,2,2);}
+    else marker(point.slice(0,2),`${i+1}${owner?' · D'+owner:''}`,owner?'#ffba55':'#55baff');
+  });
+  if(!state)return;
+  const dropping=mission.suppression.stream_events?.length ? (latest(mission.suppression.stream_events)?.drones||[]) : state.drones.filter(drone=>drone.mode==='drop').map(drone=>drone.drone);
+  dropping.forEach(number=>{
+    const p=pose(tracks[number-1]);
+      stroke([[p[0],p[1],p[2]],[p[0],p[1],.1]],'#5dbaffaa',2);
+      const height=p[2]*(1-((time*2+number*.17)%1));
+      const q=project([p[0],p[1],height]);ctx.fillStyle='#a3ddff';ctx.beginPath();ctx.arc(q[0],q[1],3,0,Math.PI*2);ctx.fill();
+      const q0=project([p[0],p[1],0]);ctx.strokeStyle='#70c8ff';ctx.beginPath();ctx.ellipse(q0[0],q0[1],9,5,0,0,Math.PI*2);ctx.stroke();
+  });
+  if(state===shownState && selectedDrone===shownDrone)return;
+  shownState=state;shownDrone=selectedDrone;
+  const labels={takeoff:'Décollage',attack:'Vers le front',drop:'Largage',queued:'File de recharge',to_refill:'Vers la station',refilling:'Remplissage',depart_refill:'Retour au front',idle:'En attente',returning:'Retour à la base',landing:'Atterrissage'};
+  const inspected=largeFleet ? [state.drones[selectedDrone-1]] : state.drones;
+  document.querySelector('#tanks').innerHTML=inspected.map(drone=>`<div class="tank" style="border-color:${colors[drone.drone-1]}"><b>Drone ${drone.drone}</b> · ${labels[drone.mode]||drone.mode}<br>${drone.water_l.toFixed(1)} / ${config.suppression.tank_capacity_l} L · ${drone.position[2].toFixed(1)} m${drone.blocked?' · détour/attente':''}<progress max="${config.suppression.tank_capacity_l}" value="${drone.water_l}"></progress></div>`).join('');
+  document.querySelector('#waterStats').textContent=`${state.water_dropped_l.toFixed(1)} L largués · ${state.water_refilled_l.toFixed(1)} L rechargés · ${state.perimeter_wetted_m.toFixed(0)} m de bordures uniques arrosées cumulées · ${state.refill_queue.length} en attente · ${(state.station_owners||[state.station_owner]).filter(Boolean).length} stations réservées`;
+  if(largeFleet && state.water_fractions?.some(value=>value>0))document.querySelector('#allocation').innerHTML=`Dernière allocation ${config.suppression.allocation_model.toUpperCase()} · 16 secteurs du front<br>`+state.water_fractions.map((value,i)=>`<span style="display:inline-block;margin:4px;font-size:12px">${i+1}: ${(100*value).toFixed(1)}% <progress max="1" value="${value}" style="width:50px"></progress></span>`).join('');
+}
+function render() {
+  const w=canvas.clientWidth,h=canvas.clientHeight,dpr=window.devicePixelRatio||1;
+  if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);}
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
+  const gridExtent=hasFire?config.navigation.world_bound:40;
+  for(let i=-gridExtent;i<=gridExtent;i+=Math.max(5,gridExtent/15)){stroke([[i,-gridExtent,0],[i,gridExtent,0]],'#243746');stroke([[-gridExtent,i,0],[gridExtent,i,0]],'#243746');}
+  const snapshot=latest(mission.fire.snapshots);
+  const waterState=fighting?latest(mission.suppression.states):null;
+  if(fighting)drawWater(snapshot,waterState);
+  if(snapshot&&document.querySelector('#fire').checked)drawFire(snapshot);
+  marker(config.navigation.start,'Départ','#adc0cf');mission.navigation.goal_positions.forEach((point,i)=>{if(!largeFleet||i+1===selectedDrone)marker(point,'Base '+String(i+1),colors[i]);});
+  if(document.querySelector('#paths').checked) {
+    tracks.forEach((track,i)=>{if(largeFleet&&i+1!==selectedDrone)return;ctx.globalAlpha=.3;const stride=Math.max(1,Math.floor(track.length/180));stroke(track.filter((_,j)=>j%stride===0).map(p=>p.slice(1)),colors[i],1.5);});ctx.globalAlpha=1;
+    if(waterState){ctx.setLineDash([5,5]);waterState.drones.forEach(drone=>{if(drone.goal&&(!largeFleet||drone.drone===selectedDrone))stroke([pose(tracks[drone.drone-1]).slice(0,3),drone.goal],colors[drone.drone-1],1.5);});ctx.setLineDash([]);}
+  }
+  tracks.map((track,i)=>({i,p:pose(track)})).sort((a,b)=>project(a.p)[2]-project(b.p)[2]).forEach(({i,p})=>drawDrone(i,p));
+  slider.value=time;
+  let phase=time<config.takeoff_duration?'Décollage':time>config.duration-config.landing_duration?'Atterrissage':'Mission';
+  const activeCount=snapshot?.active_count??snapshot?.active.length??0;
+  if(fighting&&phase==='Mission')phase=time>=config.duration-config.landing_duration-config.suppression.return_duration?'Retour à la base':activeCount?'Lutte contre le feu':snapshot?.fire_potential?'Chaleur résiduelle':'Feu éteint';
+  document.querySelector('#clock').textContent=`${time.toFixed(1)} / ${config.duration} s · ${phase}`+(snapshot?` · ${activeCount} cellules en feu · ${(activeCount*config.fire.cell_size**2).toFixed(0)} m²`:'');
+}
+function frame(now) {
+  if(playing){time=Math.min(config.duration,time+Math.min((now-last)/1000,.2)*Number(document.querySelector('#speed').value));if(time===config.duration){playing=false;document.querySelector('#play').textContent='Rejouer';}}
+  last=now;render();requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+document.querySelector('#play').onclick=()=>{if(time===config.duration)time=0;playing=!playing;document.querySelector('#play').textContent=playing?'Pause':'Lecture';};
+document.querySelector('#restart').onclick=()=>{time=0;playing=true;document.querySelector('#play').textContent='Pause';};
+slider.oninput=()=>{time=Number(slider.value);};
+canvas.onpointerdown=e=>{drag=[e.clientX,e.clientY];canvas.setPointerCapture(e.pointerId);};
+canvas.onpointermove=e=>{if(!drag)return;azimuth+=(e.clientX-drag[0])*.008;elevation=Math.max(.15,Math.min(1.5,elevation+(e.clientY-drag[1])*.006));drag=[e.clientX,e.clientY];};
+canvas.onpointerup=()=>drag=null;canvas.onpointercancel=()=>drag=null;
+canvas.onwheel=e=>{e.preventDefault();zoom=Math.max(.35,Math.min(3,zoom*Math.exp(-e.deltaY*.001)));};
 </script></html>
