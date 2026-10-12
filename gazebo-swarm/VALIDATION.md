@@ -4,6 +4,35 @@ Environnement local : macOS 14.6 Apple Silicon, Gazebo Sim 8.10.0,
 installé avec Pixi 0.81.0 / conda-forge. Plugin compilé avec AppleClang 16.
 Les versions des paquets sont enregistrées dans `pixi.lock`.
 
+## Expériences séparées : un drone, un environnement
+
+- Les fichiers `environment.json`, `model.json` et `experiment.json` séparent
+  physique/épisode, paramètres PPO/réseau et graines/pas/processus. Chaque
+  expérience et chaque run possèdent leurs propres dossiers. Les entrées et
+  paramètres résolus sont archivés avant l'entraînement.
+- `training/environment.py` construit les environnements/processus,
+  `training/model.py` construit PPO, et `training/individual_env.py` définit
+  la seule classe Gym partagée. Les expériences ne copient aucune classe.
+  Le lanceur existant et `experiment.py` utilisent la même chaîne d'entraînement.
+- Deux exemples : `one_drone_calm` et `one_drone_wind`, monde de 100 m,
+  grille de 25 × 25 cellules de 2 m, feu initial de 5 × 5 cellules,
+  un drone et une station à (-36, 0). Vent moyen nul ou 1,5 m/s vers l'est.
+  Chaque exemple a effectué un essai PPO de 128 pas, avec comparaison des
+  politiques sur trois graines réservées. Ce sont des contrôles fonctionnels,
+  sans preuve de convergence. Le run calme a aussi repris 64 pas supplémentaires.
+- Les deux simulations complètes de 200 s atterrissent à leur base :
+  calme, 40 L largués et deux remplissages ; vent, 80 L et trois remplissages.
+  Bilans d'eau, doses au périmètre et clairance du domaine complet vérifiés.
+  Un export Gazebo à un drone contient des métriques JSON finies, avec zéro
+  paire à contrôler ; la position initiale correspond exactement au départ demandé.
+- **41 tests passent dans l'environnement PPO**, dont modèles de tailles
+  distinctes, mise à jour réelle/export/reprise, deux environnements parallèles,
+  isolation des acteurs, copie des seuls fichiers de setup, conservation des
+  paramètres archivés après édition et validation des paramètres.
+- Les sorties d'essai sont dans `experiments/<cas>/runs/smoke/` et sont ignorées
+  par Git. L'acteur de l'essaim dans `models/` reste inchangé. Le guide est dans
+  `experiments/README.md`.
+
 ## PPO sur 100 drones individuels et déploiement live sur 1 000
 
 - Séparation du code en `training/`, `simulation/`, `drones/` et `fire/` ;

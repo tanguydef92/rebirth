@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Live PPO swarm · 100 → 1,000 drones</title>
+<title>Live PPO fire-defense experiment</title>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#0b121b;color:#e2edf4;font:14px system-ui,sans-serif}main{max-width:1350px;margin:auto;padding:24px}h1{margin:0 0 8px;font-size:25px}p{color:#a5bac9;line-height:1.5;margin:0 0 16px}.summary,.controls,.legend{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin:16px 0}.summary strong{color:#6ee2cd}.layout{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:20px}canvas{width:100%;height:68vh;display:block;background:#131e28;border:1px solid #2c4152;border-radius:12px}.panel{border:1px solid #2c4152;border-radius:12px;padding:16px;background:#111d28}.panel h2{font-size:16px;margin:0 0 15px}.panel p{margin:8px 0;font-size:13px}.bar{height:5px;background:#244253;border-radius:3px;margin:3px 0 8px;overflow:hidden}.bar i{display:block;height:100%;background:#76dccc}.controls button,.controls select,input[type=number]{font:inherit;color:#e3f0f6;background:#20394a;border:1px solid #476477;border-radius:7px;padding:8px 11px}input[type=number]{width:75px}.legend{font-size:12px;color:#a5bac9}.note{font-size:12px}#status{color:#ffce83;font-size:13px}.allocation{font-size:12px}.stats{font-variant-numeric:tabular-nums}@media(max-width:800px){main{padding:14px}.layout{grid-template-columns:1fr}.panel{display:flex;gap:25px;flex-wrap:wrap}canvas{height:58vh}}
 </style>
@@ -9,7 +9,7 @@
 <div class="layout"><canvas id="view" aria-label="Live fire field and updated drone velocity arrows"></canvas><aside class="panel"><div><h2>Follow a drone</h2><label>Drone <input id="selected" type="number" min="1" value="1"></label><div id="inspector"></div><p id="modes"></p></div><div style="width:100%"><h2>PPO allocation</h2><div id="allocation" class="allocation"></div></div></aside></div>
 <div class="controls"><button id="play">Pause</button><button id="restart">Restart</button><label>Target speed <select id="speed"><option value="1">×1</option><option value="4">×4</option><option value="8" selected>×8</option><option value="16">×16</option></select></label><select id="layer" aria-label="Displayed field"><option value="fire">Fire</option><option value="temperature">Temperature</option><option value="fuel">Remaining fuel</option></select><label><input id="arrows" type="checkbox" checked> Directions</label><label><input id="goals" type="checkbox" checked> Selected target</label><span id="status">Live</span></div>
 <div class="legend">→ collision-checked movement · cyan: travelling · blue: dropping water · amber: refilling · white: selected drone</div>
-<p class="note">Each heading comes from the current simulation step. Refill service takes 10 seconds after arrival; a full 20 L tank is released as an instantaneous cooling impulse with a one-second drop interval. Altitudes and collision reservations remain active. The thermal fire model is a research approximation.</p></main>
+<p class="note" id="note">Each heading comes from the current simulation step. Loading the experiment's water-service settings…</p></main>
 <script>
 let meta=null,current=null,raw=null,lastGrid='',shownGrid='',shownLayer='',selected=1,source=null;
 const canvas=document.querySelector('#view'),ctx=canvas.getContext('2d'),surface=document.createElement('canvas'),surfaceContext=surface.getContext('2d');
@@ -48,7 +48,7 @@ function render(){
     }
     if(id===selected){ctx.fillStyle='#fff';ctx.font='12px system-ui';ctx.fillText('D'+id,q[0]+7,q[1]-6);
       if(document.querySelector('#goals').checked&&gx!==null){const goal=project(gx,gy);ctx.strokeStyle='#ffffff88';ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(...q);ctx.lineTo(...goal);ctx.stroke();ctx.setLineDash([]);}
-      document.querySelector('#inspector').innerHTML=`<p>${meta.modes[mode]} · altitude ${z.toFixed(1)} m</p><p>Water ${water.toFixed(1)} / 20 L</p><p>Velocity (${vx.toFixed(1)}, ${vy.toFixed(1)}, ${vz.toFixed(1)}) m/s</p><p>${d[12]===null?'No station reserved':'Station '+(d[12]+1)}</p>`;
+      document.querySelector('#inspector').innerHTML=`<p>${meta.modes[mode]} · altitude ${z.toFixed(1)} m</p><p>Water ${water.toFixed(1)} / ${meta.config.suppression.tank_capacity_l} L</p><p>Velocity (${vx.toFixed(1)}, ${vy.toFixed(1)}, ${vz.toFixed(1)}) m/s</p><p>${d[12]===null?'No station reserved':'Station '+(d[12]+1)}</p>`;
     }
   }
   ctx.fillStyle='#c3d9e5';ctx.font='12px system-ui';ctx.fillText('N ↑',left+8,top+18);
@@ -75,7 +75,9 @@ function receive(packet){
 async function connect(){
   const response=await fetch('/meta');meta=await response.json();surface.width=meta.grid.nx;surface.height=meta.grid.ny;
   document.querySelector('#selected').max=meta.config.drone_count;
-  document.querySelector('#subtitle').textContent=`Trained with ${meta.trained_drone_count} drones · running ${meta.config.drone_count} · ${meta.config.fire.cell_size} m fire cells · 10 s refill / 1 s drop`;
+  const service=meta.config.suppression;
+  document.querySelector('#subtitle').textContent=`Trained with ${meta.trained_drone_count} ${meta.trained_drone_count===1?'drone':'drones'} · running ${meta.config.drone_count} · ${meta.config.fire.cell_size} m fire cells · ${service.refill_duration} s refill / ${service.drop_duration} s drop`;
+  document.querySelector('#note').textContent=`Each heading comes from the current simulation step. Refill service takes ${service.refill_duration} seconds after arrival; a full ${service.tank_capacity_l} L tank is released as an instantaneous cooling impulse with a ${service.drop_duration}-second drop interval. Altitudes and collision reservations remain active. The thermal fire model is a research approximation.`;
   source=new EventSource('/events');source.onmessage=event=>receive(JSON.parse(event.data));source.onerror=()=>{document.querySelector('#status').textContent='Reconnecting…';};
   await command({command:'resume'});
 }

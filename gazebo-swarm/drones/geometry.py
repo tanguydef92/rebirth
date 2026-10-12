@@ -3,9 +3,9 @@ import math
 
 
 def formation_offsets(config):
-    columns = 2
+    columns = min(2, config['drone_count'])
     rows = math.ceil(config["drone_count"] / columns)
-    return [((i % columns - 0.5) * config["spacing"],
+    return [((i % columns - (columns - 1) / 2) * config["spacing"],
              (i // columns - (rows - 1) / 2) * config["spacing"])
             for i in range(config["drone_count"])]
 

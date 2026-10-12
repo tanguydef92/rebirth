@@ -53,13 +53,17 @@ def validate_fire_config(fire, duration, world_bound):
 
 
 def load_config(path):
-    config = json.loads(Path(path).read_text())
+    return validate_config(json.loads(Path(path).read_text()))
+
+
+def validate_config(config):
+    """Validate an already assembled setup without reading another file."""
     required = {'drone_count','pattern','duration','takeoff_duration','landing_duration','sample_hz',
                 'spacing','minimum_separation','maximum_speed','show_paths','navigation','fire','suppression'}
     if not required <= set(config) or set(config) - required - {'learning','visualization'}:
         raise ValueError('Configuration keys must match configs/ppo-1000-fast.json')
-    if type(config['drone_count']) is not int or not 2 <= config['drone_count'] <= 1000:
-        raise ValueError('drone_count must be an integer from 2 to 1000')
+    if type(config['drone_count']) is not int or not 1 <= config['drone_count'] <= 1000:
+        raise ValueError('drone_count must be an integer from 1 to 1000')
     if config['pattern'] != 'suppress':
         raise ValueError('The supported mission is suppress')
     if type(config['show_paths']) is not bool:

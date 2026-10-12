@@ -4,6 +4,25 @@ Train with **100 individual drones**, then deploy the same central policy with
 **1,000 drones**. Training, live simulation and Gazebo exports use the same
 causal engine, thermal fire, drone motion and water-service logic.
 
+## Small experiments, one folder per setup
+
+Use the new [experiment guide](experiments/README.md) to try a one-drone case
+before scaling up. The included `one_drone_calm` and `one_drone_wind` folders
+separate environment, model and run settings into three JSON files. No classes
+are copied into experiment folders.
+
+```bash
+gazebo-swarm/.learning-venv/bin/python gazebo-swarm/experiment.py init my_case --template one_drone_calm
+gazebo-swarm/.learning-venv/bin/python gazebo-swarm/experiment.py train my_case --run trial-01 --steps 2048
+gazebo-swarm/.learning-venv/bin/python gazebo-swarm/experiment.py simulate my_case --run trial-01 --open
+```
+
+Edit `environment.json` for the world and episode, `model.json` for PPO and
+network layers, and `experiment.json` for seeds/steps/workers. Generated runs
+stay inside the experiment folder and keep their own setup snapshots.
+`training/environment.py` builds the environment/workers, `training/model.py`
+builds PPO, and `training/individual_env.py` defines the shared Gym class.
+
 ## Launch
 
 From the repository root:
@@ -123,6 +142,7 @@ relief, detailed chemistry and three-dimensional gas flow are omitted.
 | --- | --- |
 | Configuration and safety bounds | [configuration.py](configuration.py), [simulation/settings.py](simulation/settings.py) |
 | Training, reward and evaluation | [training/ppo.py](training/ppo.py), [individual_env.py](training/individual_env.py), [evaluation.py](training/evaluation.py) |
+| Environment/model builders and experiment setup | [training/environment.py](training/environment.py), [model.py](training/model.py), [experiments.py](training/experiments.py) |
 | Shared simulation and exports | [simulation/engine.py](simulation/engine.py), [mission.py](simulation/mission.py), [validation.py](simulation/validation.py) |
 | Live viewer | [simulation/live.py](simulation/live.py), [live.html](simulation/live.html) |
 | Targets, water and navigation | [drones/controller.py](drones/controller.py), [navigation.py](drones/navigation.py), [geometry.py](drones/geometry.py), [spatial.py](drones/spatial.py) |
@@ -131,7 +151,7 @@ relief, detailed chemistry and three-dimensional gas flow are omitted.
 | Training/deployment settings | [configs/ppo-100-fast.json](configs/ppo-100-fast.json), [ppo-1000-fast.json](configs/ppo-1000-fast.json) |
 | Gazebo models and playback | [swarm.py](swarm.py), [src/SwarmPlayback.cc](src/SwarmPlayback.cc), [Trajectory.hh](src/Trajectory.hh) |
 
-Root scripts `train_ppo.py`, `live_sim.py` and `fire_only.py` are executable
+Root scripts `experiment.py`, `train_ppo.py`, `live_sim.py` and `fire_only.py` are executable
 entry points. Implementation changes belong in the packages above. Only thermal
 fire, individual-drone training and the current 87-feature actor are supported.
 

@@ -28,7 +28,7 @@ GROUND_Z = 0.3
 
 def validate_trajectories(config, trajectories):
     """Validate the *continuous piecewise linear paths* used by the plugin."""
-    if len(trajectories) > 200:
+    if len(trajectories) == 1 or len(trajectories) > 200:
         return validate_large_trajectories(config, trajectories)
     minimum_squared = math.inf
     maximum_speed = 0.0

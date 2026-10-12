@@ -1,0 +1,23 @@
+{
+  "algorithm": "PPO",
+  "policy": "MlpPolicy",
+  "device": "cpu",
+  "net_arch": {
+    "pi": [
+      32,
+      32
+    ],
+    "vf": [
+      32,
+      32
+    ]
+  },
+  "n_steps": 64,
+  "batch_size": 64,
+  "n_epochs": 4,
+  "learning_rate": 0.0003,
+  "gamma": 0.99,
+  "gae_lambda": 0.95,
+  "clip_range": 0.2,
+  "ent_coef": 0.01
+}

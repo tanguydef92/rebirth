@@ -3,6 +3,18 @@
 - [Gazebo swarm](gazebo-swarm/README.md): thermal wildfire simulation, PPO training with 100 individual drones, and deployment with 1,000 drones.
 - [ForFiS prototype](forfis-prototype/README.md): forest-fire simulation.
 
+To create a small one-drone experiment with separate environment, model and
+training settings:
+
+```bash
+gazebo-swarm/.learning-venv/bin/python gazebo-swarm/experiment.py init my_case --template one_drone_calm
+gazebo-swarm/.learning-venv/bin/python gazebo-swarm/experiment.py train my_case --run trial-01
+```
+
+Each case has its own folder and generated runs. See the
+[experiment guide](gazebo-swarm/experiments/README.md) for the calm/wind examples,
+editing setup, resuming and visualization.
+
 From the repository root, launch the current live simulation:
 
 ```bash

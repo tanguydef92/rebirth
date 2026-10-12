@@ -1,0 +1,21 @@
+{
+  "seed": 7,
+  "training_seeds": [
+    101,
+    102,
+    103,
+    104
+  ],
+  "validation_seeds": [
+    301,
+    302
+  ],
+  "test_seeds": [
+    9001,
+    9002,
+    9003
+  ],
+  "steps": 2048,
+  "num_envs": 1,
+  "validation_interval": 512
+}

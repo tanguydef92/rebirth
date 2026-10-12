@@ -1,0 +1,97 @@
+{
+  "drone_count": 1,
+  "pattern": "suppress",
+  "duration": 200.0,
+  "takeoff_duration": 20.0,
+  "landing_duration": 20.0,
+  "sample_hz": 2,
+  "spacing": 6.0,
+  "minimum_separation": 5.0,
+  "maximum_speed": 10.0,
+  "show_paths": true,
+  "navigation": {
+    "start": [
+      -36.0,
+      0.0
+    ],
+    "cruise_speed": 8.0,
+    "vertical_speed": 3.0,
+    "descent_speed": 2.0,
+    "world_bound": 50.0,
+    "clearance": 3.0
+  },
+  "fire": {
+    "seed": 42,
+    "cell_size": 2.0,
+    "domain": [
+      -12,
+      12,
+      -12,
+      12
+    ],
+    "initial_cells": [
+      [
+        0,
+        0
+      ]
+    ],
+    "ignition_time": 0.0,
+    "update_interval": 1.0,
+    "height": 8.0,
+    "initial_rectangle": [
+      -2,
+      2,
+      -2,
+      2
+    ],
+    "model": "lagrangian",
+    "physics": {
+      "wind_m_s": [
+        1.5,
+        0.0
+      ],
+      "turbulence_rms_m_s": 0.3
+    },
+    "terrain_regions": []
+  },
+  "suppression": {
+    "tank_capacity_l": 20.0,
+    "water_to_extinguish_l": 4.0,
+    "drop_radius": 0.9,
+    "refill_point": [
+      -36.0,
+      0.0,
+      1.0
+    ],
+    "holding_radius": 8.0,
+    "altitude_lanes": [
+      20.0
+    ],
+    "decision_interval": 1.0,
+    "return_duration": 40.0,
+    "water_application_l_m2": 1.0,
+    "water_payload_kg": 20.0,
+    "water_density_kg_l": 1.0,
+    "refill_duration": 10.0,
+    "perimeter_only": true,
+    "drone_radius": 1.6,
+    "refill_layout": "homes",
+    "allocation_model": "uniform",
+    "ppo_checkpoint": "runs/actor.json",
+    "state_interval": 0.5,
+    "compact_log": true,
+    "drop_duration": 1.0,
+    "cache_policy_actions": true,
+    "record_decisions": false
+  },
+  "visualization": {
+    "fire_tile_size": 2.0
+  },
+  "episode": {
+    "episode_duration": 120.0,
+    "decision_step_s": 1.0,
+    "observation_time_scale_s": 200.0,
+    "reward_scale": 100.0,
+    "water_cost_weight": 0.01
+  }
+}
